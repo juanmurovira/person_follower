@@ -17,15 +17,15 @@ class PersonFollower(Node):
             10)
         self.subscription  # prevent unused variable warning
 
-        self.prev_ranges = []  # Almacenamos las lecturas anteriores del láser
-        self.prev_angle_to_person = 0.0  # Almacenamos el ángulo a la persona en la iteración anterior
-        self.min_distance = 0.3  # Establecer una distancia mínima para evitar colisiones
+        self.prev_ranges = []  # Store previous laser readings
+        self.prev_angle_to_person = 0.0  # Store angle to the person in the previous iteration
+        self.min_distance = 0.3  # Set a minimum distance to avoid collisions
 
     def detect_person(self, ranges):
-        # Tu lógica para determinar si hay una persona en los datos del láser
-        # Ajusta esto según tu entorno
+        # Your logic to determine if there is a person in the laser data
+        # Adjust this according to your environment
         min_range = min(ranges)
-        person_threshold = 1.0  # Ajusta este umbral según tu entorno
+        person_threshold = 1.0  # Adjust this threshold according to your environment
         return min_range < person_threshold
 
     def listener_callback(self, input_msg):
@@ -52,11 +52,11 @@ class PersonFollower(Node):
             # Check if the robot is too close to the person
             if min(ranges) < self.min_distance:
                 # Reduce the forward velocity
-                vx = 0.05  # Velocidad reducida
+                vx = 0.05  # Reduced velocity
             else:
-                vx = 0.2  # Velocidad normal
+                vx = 0.2  # Normal velocity
 
-            # Use the angle to person as the target angle for the robot to aim towards
+            # Use the angle to the person as the target angle for the robot to aim towards
             target_angle = angle_to_person
 
             # Calculate the difference between the target angle and the current angle (heading) of the robot
