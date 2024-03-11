@@ -59,7 +59,7 @@ class PersonFollower(Node):
             target_angle = angle_to_person
 
             # Calculate the difference between the target angle and the current angle (heading) of the robot
-            angle_difference = -target_angle
+            angle_difference = -target_angle  # Negative to change the orientation to move
 
             # Limit the angular velocity to avoid excessive spinning
             max_angular_velocity = 0.6
