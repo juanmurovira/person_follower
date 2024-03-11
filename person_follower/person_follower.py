@@ -15,15 +15,14 @@ class PersonFollower(Node):
             '/scan',
             self.listener_callback,
             10)
-        self.subscription  # prevent unused variable warning
+        self.subscription 
 
         self.prev_ranges = []  # Store previous laser readings
         self.prev_angle_to_person = 0.0  # Store angle to the person in the previous iteration
         self.min_distance = 0.3  # Set a minimum distance to avoid collisions
 
     def detect_person(self, ranges):
-        # Your logic to determine if there is a person in the laser data
-        # Adjust this according to your environment
+        # Logic to determine if there is a person in the laser data
         min_range = min(ranges)
         person_threshold = 1.0  # Adjust this threshold according to your environment
         return min_range < person_threshold
