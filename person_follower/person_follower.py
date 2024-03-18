@@ -22,10 +22,22 @@ class PersonFollower(Node):
         self.min_distance = 0.3  # Set a minimum distance to avoid collisions
 
     def detect_person(self, ranges):
-        # Logic to determine if there is a person in the laser data
-        min_range = min(ranges)
-        person_threshold = 1.0  # Adjust this threshold according to your environment
-        return min_range < person_threshold
+    	# Logic to determine if there is a person in the laser data
+    	min_range = min(ranges)
+    	person_threshold = 1.5  # Threshold for person detection
+    	obstacle_threshold = 0.4  # Threshold for obstacle detection
+    
+    	# Check if the minimum range is below the obstacle threshold
+    	if min_range < obstacle_threshold:
+        	return False  # If there's an obstacle too close, don't consider it as a person
+    
+    	# Check if the minimum range is below the person threshold
+    	if min_range < person_threshold:
+        	return True  # If the range is below the person threshold, consider it as a person
+    
+    	# If neither obstacle nor person is detected, return False
+    	return False
+
 
     def listener_callback(self, input_msg):
         angle_min = input_msg.angle_min
