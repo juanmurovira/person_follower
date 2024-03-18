@@ -1,6 +1,5 @@
 import rclpy
 from rclpy.node import Node
-
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 import math
@@ -18,26 +17,39 @@ class PersonFollower(Node):
         self.subscription 
 
         self.prev_ranges = []  # Store previous laser readings
-        self.prev_angle_to_person = 0.0  # Store angle to the person in the previous iteration
+        self.prev_angles = []  # Store previous angles for smoothing
         self.min_distance = 0.4  # Set a minimum distance to avoid collisions
+        self.angle_filter_window = 5  # Window size for angle smoothing
 
     def detect_person(self, ranges):
-    	# Logic to determine if there is a person in the laser data
-    	min_range = min(ranges)
-    	person_threshold = 1.5  # Threshold for person detection
-    	obstacle_threshold = 0.25  # Threshold for obstacle detection
-    
-    	# Check if the minimum range is below the obstacle threshold
-    	if min_range < obstacle_threshold:
-        	return False  # If there's an obstacle too close, don't consider it as a person
-    
-    	# Check if the minimum range is below the person threshold
-    	if min_range < person_threshold:
-        	return True  # If the range is below the person threshold, consider it as a person
-    
-    	# If neither obstacle nor person is detected, return False
-    	return False
+        # Logic to determine if there is a person in the laser data
+        min_range = min(ranges)
+        person_threshold = 1.5  # Threshold for person detection
+        obstacle_threshold = 0.25  # Threshold for obstacle detection
+        
+        # Check if the minimum range is below the obstacle threshold
+        if min_range < obstacle_threshold:
+            return False  # If there's an obstacle too close, don't consider it as a person
+        
+        # Check if the minimum range is below the person threshold
+        if min_range < person_threshold:
+            return True  # If the range is below the person threshold, consider it as a person
+        
+        # If neither obstacle nor person is detected, return False
+        return False
 
+    def smooth_angle(self, angle):
+        # Add the new angle to the list of previous angles
+        self.prev_angles.append(angle)
+
+        # If the list exceeds the size of the window, remove the oldest angle
+        if len(self.prev_angles) > self.angle_filter_window:
+            self.prev_angles.pop(0)
+
+        # Calculate the average angle from the angles stored in the list
+        avg_angle = sum(self.prev_angles) / len(self.prev_angles)
+        
+        return avg_angle
 
     def listener_callback(self, input_msg):
         angle_min = input_msg.angle_min
@@ -54,18 +66,15 @@ class PersonFollower(Node):
             angle_to_person = angle_min + min_range_index * angle_increment
 
             # Smooth out the angle change
-            if self.prev_angle_to_person != 0.0:
-                angle_to_person = (angle_to_person + self.prev_angle_to_person) / 2.0
-
-            # Store the current angle to use in the next iteration
-            self.prev_angle_to_person = angle_to_person
+            if self.prev_angles:
+                angle_to_person = self.smooth_angle(angle_to_person)
 
             # Check if the robot is too close to the person
             if min(ranges) < self.min_distance:
                 # Reduce the forward velocity
                 vx = 0.05  # Reduced velocity
             else:
-                vx = 0.2  # Normal velocity
+                vx = 0.35  # Normal velocity
 
             # Use the angle to the person as the target angle for the robot to aim towards
             target_angle = angle_to_person
@@ -106,3 +115,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
