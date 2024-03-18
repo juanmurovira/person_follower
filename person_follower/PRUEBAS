@@ -1,0 +1,188 @@
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
+import math
+
+class PersonFollower(Node):
+
+    def __init__(self):
+        super().__init__('person_follower')
+        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.subscription = self.create_subscription(
+            LaserScan,
+            '/scan',
+            self.listener_callback,
+            10)
+        self.subscription 
+
+        self.prev_angles = []  # Store previous angles for smoothing
+        self.min_distance = 0.4  # Set a minimum distance to avoid collisions
+        self.angle_filter_window = 5  # Window size for angle smoothing
+        self.wall_distance_threshold = 0.3  # Threshold for being close to walls
+        self.following_person = True  # Flag to indicate if the robot is following a person
+        self.obstacle_detected = False  # Flag to indicate if an obstacle is detected
+
+    def detect_wall_proximity(self, ranges):
+        # Logic to determine if the robot is close to walls
+        min_range = min(ranges)
+        return min_range < self.wall_distance_threshold
+
+    def avoid_obstacle(self, ranges):
+        # Logic to detect obstacles
+        # Implement your own obstacle detection logic here
+        # For example, check if there are any ranges below a certain threshold
+        return min(ranges) < self.min_distance
+
+    def escape_obstacle(self, ranges):
+    	# Logic to determine the angle to escape from the obstacle
+    	# Implement your own obstacle escape strategy here
+    	# For example, find the direction with the largest gap in ranges and turn towards it
+    	max_gap = 0
+    	escape_angle = 0
+    	angle_increment = input_msg.angle_increment  # Angle increment between laser scan measurements
+    	for i in range(len(ranges)):
+    	    if ranges[i] > max_gap:
+    	        max_gap = ranges[i]
+    	        escape_angle = i
+
+    	# Calculate the real angle to escape
+    	escape_angle = (escape_angle - len(ranges) / 2) * angle_increment
+
+	    return escape_angle
+
+        
+    def avoid_walls(self, ranges):
+    # Logic to avoid walls (example implementation)
+    min_range_index = ranges.index(min(ranges))
+    angle_min = -math.pi / 2  # Minimum angle of the laser scan
+    angle_increment = math.pi / len(ranges)  # Angle increment between laser scan measurements
+
+    # Calculate the angle to the wall
+    angle_to_wall = angle_min + min_range_index * angle_increment
+
+    # Determine the direction to turn away from the wall
+    if angle_to_wall < 0:
+        # Turn right
+        vx = 0.0
+        wz = 0.3  # Angular velocity to turn right
+    else:
+        # Turn left
+        vx = 0.0
+        wz = -0.3  # Angular velocity to turn left
+
+    return vx, wz
+
+
+    def smooth_angle(self, angle):
+        # Add the new angle to the list of previous angles
+        self.prev_angles.append(angle)
+
+        # If the list exceeds the size of the window, remove the oldest angle
+        if len(self.prev_angles) > self.angle_filter_window:
+            self.prev_angles.pop(0)
+
+        # Calculate the average angle from the angles stored in the list
+        avg_angle = sum(self.prev_angles) / len(self.prev_angles)
+        
+        return avg_angle
+
+    def listener_callback(self, input_msg):
+        angle_min = input_msg.angle_min
+        angle_increment = input_msg.angle_increment
+        ranges = input_msg.ranges
+
+        # Check if the robot is close to walls
+        if self.detect_wall_proximity(ranges):
+            self.following_person = False  # Stop following the person
+            self.obstacle_detected = False  # Reset obstacle detection flag
+
+            # Implement logic to avoid walls
+            vx, wz = self.avoid_walls(ranges)
+        elif self.avoid_obstacle(ranges):
+            self.following_person = False  # Stop following the person
+            self.obstacle_detected = True
+            escape_angle = self.escape_obstacle(ranges)
+
+            # Set the angular velocity to turn away from the obstacle
+            wz = (escape_angle - len(ranges) / 2) * angle_increment  # Adjust angular velocity based on escape angle
+            vx = 0.2  # Linear velocity to move away from the obstacle
+
+            # Smooth out the angular velocity change
+            if self.prev_angles:
+                wz = self.smooth_angle(wz)
+        elif self.obstacle_detected:
+            # If no obstacle is detected but obstacle_detected flag is True, stop the robot
+            vx = 0.0
+            wz = 0.0
+        else:
+            # If not close to walls or obstacles, resume following the person
+            self.following_person = True
+
+            # Implement logic to follow the person (similar to your existing logic)
+            # For example, calculate the angle to the person and adjust velocity
+
+            # Check if a person is detected
+            if self.detect_person(ranges):
+                # Find the index of the minimum range (closest obstacle)
+                min_range_index = ranges.index(min(ranges))
+
+                # Calculate the angle to the person
+                angle_to_person = angle_min + min_range_index * angle_increment
+
+                # Smooth out the angle change
+                if self.prev_angles:
+                    angle_to_person = self.smooth_angle(angle_to_person)
+
+                # Check if the robot is too close to the person
+                if min(ranges) < self.min_distance:
+                    # Reduce the forward velocity
+                    vx = 0.05  # Reduced velocity
+                else:
+                    vx = 0.35  # Normal velocity
+
+                # Use the angle to the person as the target angle for the robot to aim towards
+                target_angle = angle_to_person
+
+                # Calculate the difference between the target angle and the current angle (heading) of the robot
+                angle_difference = -target_angle  # Negative to change the orientation to move
+
+                # Limit the angular velocity to avoid excessive spinning
+                max_angular_velocity = 0.6
+                if abs(angle_difference) > max_angular_velocity:
+                    angle_difference = max_angular_velocity if angle_difference > 0 else -max_angular_velocity
+
+                # Set the angular velocity of the robot based on the difference in angles
+                wz = 2.0 * angle_difference
+
+                # Smooth out the angular velocity change
+                if self.prev_angles:
+                    wz = self.smooth_angle(wz)
+            else:
+                # If no person is detected, stop the robot
+                vx = 0.0
+                wz = 0.0
+
+        # Create Twist message and publish
+        output_msg = Twist()
+        output_msg.linear.x = vx
+        output_msg.angular.z = wz
+        self.publisher_.publish(output_msg)
+
+    def detect_person(self, ranges):
+        # Logic to determine if there is a person in the laser data
+        # Implement your own person detection logic here
+        # For example, check if there are any ranges below a certain threshold
+        min_range = min(ranges)
+        person_threshold = 1.5  # Threshold for person detection
+        return min_range < person_threshold
+
+def main(args=None):
+    rclpy.init(args=args)
+    person_follower = PersonFollower()
+    rclpy.spin(person_follower)
+    person_follower.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
