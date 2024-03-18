@@ -19,13 +19,13 @@ class PersonFollower(Node):
 
         self.prev_ranges = []  # Store previous laser readings
         self.prev_angle_to_person = 0.0  # Store angle to the person in the previous iteration
-        self.min_distance = 0.3  # Set a minimum distance to avoid collisions
+        self.min_distance = 0.4  # Set a minimum distance to avoid collisions
 
     def detect_person(self, ranges):
     	# Logic to determine if there is a person in the laser data
     	min_range = min(ranges)
     	person_threshold = 1.5  # Threshold for person detection
-    	obstacle_threshold = 0.4  # Threshold for obstacle detection
+    	obstacle_threshold = 0.25  # Threshold for obstacle detection
     
     	# Check if the minimum range is below the obstacle threshold
     	if min_range < obstacle_threshold:
