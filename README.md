@@ -1,3 +1,12 @@
+uavizado de movimientos: Actualmente, el robot ajusta directamente su velocidad y dirección para seguir a una persona detectada. Podrías implementar un suavizado en los cambios de velocidad y dirección para evitar movimientos bruscos.
+
+Manejo de obstáculos: El robot actualmente no tiene en cuenta la presencia de obstáculos en su entorno. Podrías agregar lógica para evitar obstáculos mientras sigue a una persona, por ejemplo, deteniéndose temporalmente o ajustando su trayectoria para evitar colisiones.
+
+Retraso en la detección: Si la persona que el robot sigue se mueve rápidamente o sale repentinamente del rango de detección, puede haber un retraso en la detección de este cambio de situación. Podrías implementar alguna forma de estimación o predicción de movimiento para mejorar la capacidad de seguimiento del robot.
+
+
+
+
 # Person-following Python ROS 2 template
 
 We assume that [ROS 2](https://docs.ros.org/) and [Webots](https://cyberbotics.com/) are installed in the system. 
