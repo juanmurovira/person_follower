@@ -5,7 +5,6 @@ from geometry_msgs.msg import Twist
 import math
 
 class PersonFollower(Node):
-
     def __init__(self):
         super().__init__('person_follower')
         self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
@@ -14,42 +13,35 @@ class PersonFollower(Node):
             '/scan',
             self.listener_callback,
             10)
-        self.subscription 
-
+        self.state = "reposo"  # Estado inicial
         self.prev_ranges = []  # Store previous laser readings
         self.prev_angles = []  # Store previous angles for smoothing
         self.min_distance = 0.4  # Set a minimum distance to avoid collisions
         self.angle_filter_window = 5  # Window size for angle smoothing
+        self.search_threshold = 1.5  # Rango de detección durante la búsqueda
+        self.follow_threshold = 0.25  # Rango de detección durante el seguimiento
+        self.follow_angle_range = 75  # Rango de ángulo de detección durante el seguimiento
+        self.follow_angle_start = -self.follow_angle_range / 2  # Ángulo inicial del rango de detección
+        self.follow_angle_end = self.follow_angle_range / 2  # Ángulo final del rango de detección
 
-    def detect_person(self, ranges):
-        # Logic to determine if there is a person in the laser data
-        min_range = min(ranges)
-        person_threshold = 1.5  # Threshold for person detection
-        obstacle_threshold = 0.25  # Threshold for obstacle detection
-        
-        # Check if the minimum range is below the obstacle threshold
-        if min_range < obstacle_threshold:
-            return False  # If there's an obstacle too close, don't consider it as a person
-        
-        # Check if the minimum range is below the person threshold
-        if min_range < person_threshold:
-            return True  # If the range is below the person threshold, consider it as a person
-        
-        # If neither obstacle nor person is detected, return False
-        return False
+    def detect_person(self, ranges, angle_min, angle_increment):
+        # Lógica para detectar a una persona
+        start_index = max(0, int((self.follow_angle_start - angle_min) / angle_increment))
+        end_index = min(len(ranges) - 1, int((self.follow_angle_end - angle_min) / angle_increment))
+        relevant_ranges = ranges[start_index:end_index+1]
+        min_range = min(relevant_ranges)
+        return min_range < self.follow_threshold
 
     def smooth_angle(self, angle):
-        # Add the new angle to the list of previous angles
+        # Lógica para suavizar el ángulo
         self.prev_angles.append(angle)
-
-        # If the list exceeds the size of the window, remove the oldest angle
         if len(self.prev_angles) > self.angle_filter_window:
             self.prev_angles.pop(0)
+        return sum(self.prev_angles) / len(self.prev_angles)
 
-        # Calculate the average angle from the angles stored in the list
-        avg_angle = sum(self.prev_angles) / len(self.prev_angles)
-        
-        return avg_angle
+    def change_state(self, new_state):
+        # Cambiar el estado del robot
+        self.state = new_state
 
     def listener_callback(self, input_msg):
         angle_min = input_msg.angle_min
@@ -57,58 +49,64 @@ class PersonFollower(Node):
         angle_increment = input_msg.angle_increment
         ranges = input_msg.ranges
 
-        # Check if a person is detected
-        if self.detect_person(ranges):
-            # Find the index of the minimum range (closest obstacle)
-            min_range_index = ranges.index(min(ranges))
+        if self.state == "reposo":
+            # En estado de reposo, no hacer nada
+            return
 
-            # Calculate the angle to the person
-            angle_to_person = angle_min + min_range_index * angle_increment
-
-            # Smooth out the angle change
-            if self.prev_angles:
-                angle_to_person = self.smooth_angle(angle_to_person)
-
-            # Check if the robot is too close to the person
-            if min(ranges) < self.min_distance:
-                # Reduce the forward velocity
-                vx = 0.05  # Reduced velocity
+        if self.state == "busqueda":
+            # Realizar una búsqueda de 360 grados
+            if self.detect_person(ranges, angle_min, angle_increment):
+                # Si se detecta a una persona, cambiar al estado de seguimiento
+                self.change_state("seguimiento")
             else:
-                vx = 0.35  # Normal velocity
+                # Realizar una búsqueda completa girando en el lugar
+                output_msg = Twist()
+                output_msg.angular.z = 0.5  # Velocidad angular para girar
+                self.publisher_.publish(output_msg)
+            return
 
-            # Use the angle to the person as the target angle for the robot to aim towards
-            target_angle = angle_to_person
+        if self.state == "seguimiento":
+            # Estado de seguimiento: seguir a la persona detectada
+            if self.detect_person(ranges, angle_min, angle_increment):
+                min_range_index = ranges.index(min(ranges))
+                angle_to_person = angle_min + min_range_index * angle_increment
+                if self.prev_angles:
+                    angle_to_person = self.smooth_angle(angle_to_person)
 
-            # Calculate the difference between the target angle and the current angle (heading) of the robot
-            angle_difference = -target_angle  # Negative to change the orientation to move
+                if min(ranges) < self.min_distance:
+                    vx = 0.05  # Velocidad reducida
+                else:
+                    vx = 0.35  # Velocidad normal
 
-            # Limit the angular velocity to avoid excessive spinning
-            max_angular_velocity = 0.6
-            if abs(angle_difference) > max_angular_velocity:
-                angle_difference = max_angular_velocity if angle_difference > 0 else -max_angular_velocity
+                target_angle = angle_to_person
+                angle_difference = -target_angle  # Cambio de orientación para moverse
 
-            # Set the angular velocity of the robot based on the difference in angles
-            wz = 2.0 * angle_difference
+                max_angular_velocity = 0.6
+                if abs(angle_difference) > max_angular_velocity:
+                    angle_difference = max_angular_velocity if angle_difference > 0 else -max_angular_velocity
 
-            # Create Twist message and publish
-            output_msg = Twist()
-            output_msg.linear.x = vx
-            output_msg.angular.z = wz
-            self.publisher_.publish(output_msg)
-        else:
-            # If no person is detected, stop the robot
-            vx = 0.0
-            wz = 0.0
+                wz = 2.0 * angle_difference
 
-            # Create Twist message and publish
-            output_msg = Twist()
-            output_msg.linear.x = vx
-            output_msg.angular.z = wz
-            self.publisher_.publish(output_msg)
+                output_msg = Twist()
+                output_msg.linear.x = vx
+                output_msg.angular.z = wz
+                self.publisher_.publish(output_msg)
+            else:
+                # Si la persona ya no se detecta, volver al estado de búsqueda
+                self.change_state("busqueda")
+            return
 
 def main(args=None):
     rclpy.init(args=args)
     person_follower = PersonFollower()
+
+    # Cambiar al estado de reposo inicialmente
+    person_follower.change_state("reposo")
+
+    # Después de un tiempo, cambiar al estado de búsqueda
+    person_follower.get_logger().info("Iniciando búsqueda...")
+    person_follower.change_state("busqueda")
+
     rclpy.spin(person_follower)
     person_follower.destroy_node()
     rclpy.shutdown()
